@@ -354,11 +354,7 @@ include $(srctree)/scripts/Kbuild.include
 
 # Make variables (CC, etc...)
 AS		= $(CROSS_COMPILE)as
-<<<<<<< HEAD
-LD		= $(CROSS_COMPILE)ld
-=======
 LD		= $(CROSS_COMPILE)ld.bfd
->>>>>>> 38758c5... Makefile: Optimize
 CC		= $(CCACHE) $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
