@@ -2769,6 +2769,8 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 			if (intf >= VFE_RAW_0 &&
 				intf < VFE_SRC_MAX) {
 				vfe_dev->axi_data.src_info[intf].active = 0;
+				vfe_dev->axi_data.src_info[intf].flag = 0;
+
 			}
 		} else
 			src_mask |= (1 << intf);
@@ -2813,6 +2815,7 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 		for (i = VFE_RAW_0; i < VFE_SRC_MAX; i++) {
 			if (src_mask & (1 << i)) {
 				vfe_dev->axi_data.src_info[i].active = 0;
+				vfe_dev->axi_data.src_info[i].flag = 0;
 			}
 		}
 	}
@@ -3431,6 +3434,30 @@ int msm_isp_update_axi_stream(struct vfe_device *vfe_dev, void *arg)
 			return -EINVAL;
 		}
 	}
+	case UPDATE_STREAM_REQUEST_FRAMES_VER2: {
+		struct msm_vfe_axi_stream_cfg_update_info_req_frm *req_frm =
+			&update_cmd->req_frm_ver2;
+		if (HANDLE_TO_IDX(req_frm->stream_handle) >= VFE_AXI_SRC_MAX) {
+			pr_err("%s: Invalid stream handle\n", __func__);
+			rc = -EINVAL;
+			break;
+		}
+		stream_info = &axi_data->stream_info[HANDLE_TO_IDX(
+				req_frm->stream_handle)];
+		rc = msm_isp_request_frame(vfe_dev, stream_info,
+			req_frm->user_stream_id,
+			req_frm->frame_id,
+			req_frm->buf_index);
+		if (rc)
+			pr_err("%s failed to request frame!\n",
+				__func__);
+		break;
+	}
+	default:
+		pr_err("%s: Invalid update type\n", __func__);
+		return -EINVAL;
+	}
+
 	return rc;
 }
 

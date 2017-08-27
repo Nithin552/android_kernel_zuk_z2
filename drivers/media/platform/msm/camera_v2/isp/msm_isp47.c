@@ -1417,6 +1417,7 @@ static void msm_vfe47_update_camif_state(struct vfe_device *vfe_dev,
 		msm_camera_io_w_mb((update_state == DISABLE_CAMIF ? 0x0 : 0x6),
 				vfe_dev->vfe_base + 0x478);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
+		vfe_dev->axi_data.src_info[VFE_PIX_0].flag = 0;
 		/* testgen OFF*/
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].input_mux == TESTGEN)
 			msm_camera_io_w(1 << 1, vfe_dev->vfe_base + 0xC58);
@@ -1597,11 +1598,18 @@ static void msm_vfe47_cfg_axi_ub_equal_default(
 	uint32_t prop_size = 0;
 	uint32_t wm_ub_size;
 	uint64_t delta;
+	uint32_t rdi_ub_offset;
 
-	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
-		if (axi_data->free_wm[i] > 0) {
-			num_used_wms++;
-			total_image_size += axi_data->wm_image_size[i];
+	if (frame_src == VFE_PIX_0) {
+		for (i = 0; i < axi_data->hw_info->num_wm; i++) {
+			if (axi_data->free_wm[i] &&
+				SRC_TO_INTF(
+				HANDLE_TO_IDX(axi_data->free_wm[i])) ==
+				VFE_PIX_0) {
+				num_used_wms++;
+				total_image_size +=
+					axi_data->wm_image_size[i];
+			}
 		}
 	}
 	if (vfe_dev->pdev->id == ISP_VFE0) {
@@ -1614,7 +1622,17 @@ static void msm_vfe47_cfg_axi_ub_equal_default(
 		pr_err("%s: incorrect VFE device\n", __func__);
 	}
 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
-		if (axi_data->free_wm[i]) {
+		if (!axi_data->free_wm[i]) {
+			msm_camera_io_w(0,
+				vfe_dev->vfe_base +
+				vfe_dev->hw_info->vfe_ops.axi_ops.
+					ub_reg_offset(vfe_dev, i));
+		}
+		if (!axi_data->free_wm[i] || frame_src != SRC_TO_INTF(
+				HANDLE_TO_IDX(axi_data->free_wm[i])))
+			continue;
+
+		if (frame_src == VFE_PIX_0) {
 			delta = (uint64_t)axi_data->wm_image_size[i] *
 					(uint64_t)prop_size;
 			do_div(delta, total_image_size);
@@ -1623,9 +1641,19 @@ static void msm_vfe47_cfg_axi_ub_equal_default(
 			msm_camera_io_w(ub_offset << 16 | (wm_ub_size - 1),
 				vfe_dev->vfe_base + VFE47_WM_BASE(i) + 0x18);
 			ub_offset += wm_ub_size;
-		} else
-			msm_camera_io_w(0,
-				vfe_dev->vfe_base + VFE47_WM_BASE(i) + 0x18);
+		} else {
+
+			rdi_ub_offset = (SRC_TO_INTF(
+					HANDLE_TO_IDX(axi_data->free_wm[i])) -
+					VFE_RAW_0) * 2 *
+					axi_data->hw_info->min_wm_ub;
+			wm_ub_size = axi_data->hw_info->min_wm_ub * 2;
+			msm_camera_io_w((rdi_ub_offset << 16 |
+				(wm_ub_size - 1)),
+				vfe_dev->vfe_base +
+				vfe_dev->hw_info->vfe_ops.axi_ops.
+						ub_reg_offset(vfe_dev, i));
+		}
 	}
 }
 
